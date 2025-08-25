@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Astraea | AI Legal Assistant</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- PDF Export Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <style>
+        /* Custom styles for the glassmorphism effect and animations */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0a0a0a;
+            /* Darker background */
+            overflow: hidden;
+        }
+
+        .glass-panel {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border-radius: 1.5rem;
+            /* 24px */
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.4s ease-in-out;
+        }
+
+        .background-shapes {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .shape {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(180px);
+            /* Increased blur */
+            opacity: 0.5;
+        }
+
+        .shape1 {
+            width: 450px;
+            height: 450px;
+            background: #4285F4;
+            top: -150px;
+            left: -150px;
+        }
+
+        .shape2 {
+            width: 400px;
+            height: 400px;
+            background: #DB4437;
+            bottom: -100px;
+            right: -200px;
+        }
+
+        .shape3 {
+            width: 300px;
+            height: 300px;
+            background: #F4B400;
+            bottom: 25%;
+            left: 25%;
+        }
+
+        .shape4 {
+            width: 250px;
+            height: 250px;
+            background: #0F9D58;
+            top: 15%;
+            right: 20%;
+        }
+
+        /* Custom scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        /* Keyframes for animations */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(66, 133, 244, 0.7);
+            }
+
+            70% {
+                box-shadow: 0 0 0 10px rgba(66, 133, 244, 0);
+            }
+        }
+
+        @keyframes popup-appear {
+            from {
+                opacity: 0;
+                transform: translateY(10px) scale(0.95);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        .animate-pulse-speak {
+            animation: pulse 2s infinite;
+        }
+
+        /* Style for the "Ask about this" pop-up */
+        #ask-popup {
+            position: absolute;
+            background: rgba(66, 133, 244, 0.5);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            z-index: 100;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            animation: popup-appear 0.2s ease-out forwards;
+        }
+
+        /* FIX: Style for dropdown options to be visible */
+        .select-dropdown-option {
+            color: black;
+            background-color: white;
+        }
+
+        /* Styles for collapsible panels */
+        .collapsible-panel {
+            transition: width 0.4s ease-in-out, padding 0.4s ease-in-out, transform 0.4s ease-in-out, opacity 0.4s ease-in-out;
+            will-change: width, padding, transform, opacity;
+        }
+
+        .collapsible-panel.collapsed {
+            width: 0 !important;
+            padding-left: 0;
+            padding-right: 0;
+            opacity: 0;
+            transform: translateX(-20px);
+            overflow: hidden;
+        }
+
+        #chat-output-panel.collapsed {
+            transform: translateX(20px);
+        }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-white">
+
+    <div class="background-shapes">
+        <div class="shape shape1"></div>
+        <div class="shape shape2"></div>
+        <div class="shape shape3"></div>
+        <div class="shape shape4"></div>
+    </div>
+
+    <div class="flex h-screen p-4 sm:p-6 lg:p-8 gap-4 sm:gap-6 lg:gap-8">
+
+        <!-- History Sidebar (Collapsible) -->
+        <aside id="history-panel"
+            class="w-full sm:w-72 lg:w-80 glass-panel p-6 flex-col h-full hidden md:flex collapsible-panel">
+            <h2 class="text-xl font-bold mb-4 whitespace-nowrap">Interaction History</h2>
+            <div class="custom-scrollbar flex-1 overflow-y-auto -mr-4 pr-4 space-y-4">
+                <div class="bg-white/10 p-4 rounded-xl">
+                    <h4 class="font-semibold text-white">Commercial Lease Agreement.pdf</h4>
+                    <p class="text-xs text-white/50">Aug 25, 2025 - 11:48 PM</p>
+                </div>
+                <div class="bg-white/5 p-4 rounded-xl hover:bg-white/10 transition-colors duration-300 cursor-pointer">
+                    <h4 class="font-semibold text-white">NDA_Project_Phoenix.docx</h4>
+                    <p class="text-xs text-white/50">Aug 24, 2025 - 03:15 PM</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content & Chat -->
+        <div class="flex-1 flex gap-4 sm:gap-6 lg:gap-8 overflow-hidden">
+            <main id="main-content" class="flex-1 flex flex-col gap-6 h-full min-w-[300px]">
+                <header class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <button id="history-toggle-btn"
+                            class="glass-panel p-2 rounded-full hover:bg-white/20 transition-colors hidden">
+                            <i data-lucide="panel-left"></i>
+                        </button>
+                        <h1 class="text-2xl font-bold text-white">Astraea AI Legal Assistant</h1>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button id="chat-toggle-btn"
+                            class="glass-panel p-2 rounded-full hover:bg-white/20 transition-colors hidden">
+                            <i data-lucide="panel-right"></i>
+                        </button>
+                        <button class="glass-panel p-2 rounded-full hover:bg-white/20 transition-colors">
+                            <i data-lucide="user-circle"></i>
+                        </button>
+                    </div>
+                </header>
+
+                <!-- Upload Section -->
+                <div id="upload-section"
+                    class="glass-panel flex-1 flex flex-col items-center justify-center p-8 text-center transition-all duration-500">
+                    <div
+                        class="border-2 border-dashed border-white/50 rounded-2xl p-8 w-full max-w-lg flex flex-col items-center">
+                        <i data-lucide="file-up" class="w-16 h-16 text-white/70 mb-4"></i>
+                        <h2 class="text-xl font-semibold mb-2">Demystify Your Legal Documents</h2>
+                        <p class="text-white/60 mb-6">Drag & drop your file here or click to upload.</p>
+                        <button id="upload-button"
+                            class="bg-[#4285F4] hover:bg-[#357ae8] text-white font-semibold py-3 px-8 rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg">Upload
+                            File</button>
+                        <div class="mt-6 flex items-center">
+                            <input id="save-db-checkbox" type="checkbox" checked
+                                class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-600 ring-offset-gray-800 focus:ring-2">
+                            <label for="save-db-checkbox" class="ml-2 text-sm font-medium text-gray-300">Save
+                                interaction to history</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analysis Section (Initially Hidden) -->
+                <div id="analysis-section" class="hidden flex-1 flex-col gap-6 h-full animate-fade-in overflow-hidden">
+                    <div class="glass-panel p-4 flex flex-wrap items-center justify-between gap-4">
+                        <div class="flex items-center gap-4">
+                            <button id="speak-button"
+                                class="bg-[#4285F4] h-12 w-12 rounded-full flex items-center justify-center text-white flex-shrink-0 animate-pulse-speak hover:animate-none transition-transform transform hover:scale-110">
+                                <i id="speak-icon" data-lucide="volume-2" class="w-6 h-6"></i>
+                                <i id="speaking-icon" data-lucide="loader-2" class="w-6 h-6 hidden animate-spin"></i>
+                            </button>
+                            <div>
+                                <h3 class="font-semibold text-lg">AI Summary</h3>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4 flex-wrap">
+                            <div class="flex items-center gap-2">
+                                <label for="language-select" class="text-sm text-white/80">Language:</label>
+                                <select id="language-select"
+                                    class="bg-white/20 border-0 text-white text-sm rounded-lg focus:ring-[#4285F4] block w-full p-2">
+                                    <option class="select-dropdown-option" value="en" selected>English</option>
+                                    <option class="select-dropdown-option" value="es">Español</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label for="complexity-level" class="text-sm text-white/80">Complexity:</label>
+                                <select id="complexity-level"
+                                    class="bg-white/20 border-0 text-white text-sm rounded-lg focus:ring-[#4285F4] block w-full p-2">
+                                    <option class="select-dropdown-option" value="professional" selected>Professional
+                                    </option>
+                                    <option class="select-dropdown-option" value="college">College Student</option>
+                                    <option class="select-dropdown-option" value="teen">13-Year-Old</option>
+                                </select>
+                            </div>
+                            <button id="download-summary-btn"
+                                class="glass-panel p-2 rounded-full hover:bg-white/20 transition-colors">
+                                <i data-lucide="file-down"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="glass-panel flex-1 flex flex-col overflow-hidden">
+                        <div id="content-scroll-area"
+                            class="flex-1 p-6 sm:p-8 overflow-y-auto custom-scrollbar flex flex-col gap-8">
+                            <!-- Key Dates -->
+                            <div>
+                                <h3 class="font-bold text-lg mb-3">Key Dates & Term</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                                    <div class="bg-white/5 p-4 rounded-lg">
+                                        <p class="text-sm text-white/60">Start Date</p>
+                                        <p class="font-semibold text-lg">Oct 1, 2025</p>
+                                    </div>
+                                    <div class="bg-white/5 p-4 rounded-lg">
+                                        <p class="text-sm text-white/60">End Date</p>
+                                        <p class="font-semibold text-lg">Sep 30, 2030</p>
+                                    </div>
+                                    <div class="bg-white/5 p-4 rounded-lg">
+                                        <p class="text-sm text-white/60">Lease Term</p>
+                                        <p class="font-semibold text-lg">5 Years</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Parties Involved -->
+                            <div>
+                                <h3 class="font-bold text-lg mb-3">Parties Involved</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="bg-white/5 p-4 rounded-lg flex items-center gap-4"><i
+                                            data-lucide="landmark" class="w-8 h-8 text-blue-400"></i>
+                                        <div>
+                                            <p class="text-sm text-white/60">Landlord / Lessor</p>
+                                            <p class="font-semibold">Prestige Properties Inc.</p>
+                                        </div>
+                                    </div>
+                                    <div class="bg-white/5 p-4 rounded-lg flex items-center gap-4"><i
+                                            data-lucide="building-2" class="w-8 h-8 text-green-400"></i>
+                                        <div>
+                                            <p class="text-sm text-white/60">Tenant / Lessee</p>
+                                            <p class="font-semibold">Innovate Solutions LLC</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Financial Summary -->
+                            <div>
+                                <h3 class="font-bold text-lg mb-3">Financial Summary</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div class="bg-white/5 p-4 rounded-lg text-center">
+                                        <p class="text-sm text-white/60">Monthly Rent</p>
+                                        <p class="font-semibold text-lg">$5,000</p>
+                                    </div>
+                                    <div class="bg-red-500/10 p-4 rounded-lg text-center">
+                                        <p class="text-sm text-red-300/80">Security Deposit</p>
+                                        <p class="font-semibold text-lg text-red-300">$15,000</p>
+                                    </div>
+                                    <div class="bg-yellow-500/10 p-4 rounded-lg text-center">
+                                        <p class="text-sm text-yellow-300/80">Annual Rent Escalation</p>
+                                        <p class="font-semibold text-lg text-yellow-300">3%</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Key Covenants -->
+                            <div>
+                                <h3 class="font-bold text-lg mb-3">Key Covenants & Restrictions</h3>
+                                <div class="space-y-3">
+                                    <div class="bg-white/5 p-4 rounded-lg">
+                                        <p class="font-semibold">Use of Premises</p>
+                                        <p class="text-sm text-white/70">The premises are to be used solely for
+                                            commercial office purposes.</p>
+                                    </div>
+                                    <div class="bg-white/5 p-4 rounded-lg">
+                                        <p class="font-semibold">Subletting Clause</p>
+                                        <p class="text-sm text-white/70">Subletting is prohibited without prior written
+                                            consent from the landlord.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Full Summary -->
+                            <div>
+                                <h3 class="font-bold text-lg mb-3">Full Summary</h3>
+                                <div id="summary-content" class="prose prose-invert max-w-none text-white/80 space-y-4">
+                                </div><button id="show-more-btn" class="text-[#4285F4] hover:underline mt-2">Show
+                                    More</button>
+                            </div>
+                        </div>
+                        <!-- Ask a Question (in main panel) -->
+                        <div id="main-question-box" class="p-6 border-t border-white/10 hidden">
+                            <div class="flex items-center gap-2 bg-white/5 rounded-lg p-2">
+                                <input id="main-question-input" type="text"
+                                    placeholder="Ask a question about the document..."
+                                    class="bg-transparent w-full focus:outline-none p-2">
+                                <button id="main-send-button"
+                                    class="bg-[#4285F4] p-2 rounded-md hover:bg-[#357ae8] transition-colors"><i
+                                        data-lucide="send" class="w-5 h-5"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Chat Output Panel (Collapsible) -->
+            <aside id="chat-output-panel"
+                class="w-0 sm:w-0 lg:w-0 glass-panel p-0 flex-col h-full flex collapsible-panel collapsed">
+                <div class="flex items-center justify-between mb-4 p-6 pb-0 flex-shrink-0">
+                    <h2 class="text-xl font-bold whitespace-nowrap">AI Response</h2>
+                    <button id="download-chat-btn" class="text-white/70 hover:text-white transition-colors">
+                        <i data-lucide="download"></i>
+                    </button>
+                </div>
+                <div id="chat-messages" class="custom-scrollbar flex-1 overflow-y-auto -mr-4 pr-4 space-y-4 px-6"></div>
+                <!-- Ask a Question (in chat panel) -->
+                <div class="p-6 border-t border-white/10 mt-auto flex-shrink-0">
+                    <div class="flex items-center gap-2 bg-white/5 rounded-lg p-2">
+                        <input id="chat-question-input" type="text" placeholder="Ask a follow-up..."
+                            class="bg-transparent w-full focus:outline-none p-2">
+                        <button id="chat-send-button"
+                            class="bg-[#4285F4] p-2 rounded-md hover:bg-[#357ae8] transition-colors"><i
+                                data-lucide="send" class="w-5 h-5"></i></button>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM Elements ---
+            const mainContent = document.getElementById('main-content');
+            const uploadSection = document.getElementById('upload-section');
+            const analysisSection = document.getElementById('analysis-section');
+            const uploadButton = document.getElementById('upload-button');
+            const complexitySelect = document.getElementById('complexity-level');
+            const languageSelect = document.getElementById('language-select');
+            const summaryContent = document.getElementById('summary-content');
+            const keyClausesList = document.getElementById('key-clauses');
+            const speakButton = document.getElementById('speak-button');
+            const speakIcon = document.getElementById('speak-icon');
+            const speakingIcon = document.getElementById('speaking-icon');
+            const showMoreBtn = document.getElementById('show-more-btn');
+            const mainQuestionBox = document.getElementById('main-question-box');
+            const mainQuestionInput = document.getElementById('main-question-input');
+            const mainSendButton = document.getElementById('main-send-button');
+            const contentScrollArea = document.getElementById('content-scroll-area');
+            const chatOutputPanel = document.getElementById('chat-output-panel');
+            const chatMessages = document.getElementById('chat-messages');
+            const chatQuestionInput = document.getElementById('chat-question-input');
+            const chatSendButton = document.getElementById('chat-send-button');
+            const historyPanel = document.getElementById('history-panel');
+            const historyToggleBtn = document.getElementById('history-toggle-btn');
+            const chatToggleBtn = document.getElementById('chat-toggle-btn');
+            const downloadChatBtn = document.getElementById('download-chat-btn');
+            const downloadSummaryBtn = document.getElementById('download-summary-btn');
+
+            // --- Sample Data ---
+            const summaries = {
+                en: {
+                    professional: `This Commercial Lease Agreement establishes a term of five (5) years, commencing on October 1, 2025. The tenant is responsible for all utilities, maintenance, and property taxes (Triple Net Lease). A security deposit of $15,000 is due upon signing. There is an annual rent escalation clause of 3%. The premises are to be used solely for commercial office purposes. Subletting is prohibited without prior written consent from the landlord. Default on rent for more than 30 days will result in immediate termination of the lease.`,
+                    college: `This is a 5-year lease for a commercial space, starting October 1, 2025. You have to pay for all building costs like electricity, repairs, and taxes. This is called a "Triple Net Lease". You must pay a $15,000 security deposit when you sign. Your rent will go up by 3% every year. You can only use the space as an office. You can't rent it out to someone else (sublet) unless the landlord agrees in writing. If you're more than 30 days late on rent, you can be evicted immediately.`,
+                    teen: `You're renting a place for your business for 5 years, starting October 1, 2025. You have to pay for everything: the lights, any fixes, and even the property taxes. It's a big responsibility! You need to give the owner $15,000 upfront as a security deposit. Heads up: your rent will get a little more expensive (3% more) each year. You're only allowed to use this place as an office, not for anything else. Don't even think about letting a friend rent it from you unless the owner says it's okay in writing. Super important: if you're late with rent by a month, you could lose the place right away.`
+                },
+                es: {
+                    professional: `Este Contrato de Arrendamiento Comercial establece un plazo de cinco (5) años, a partir del 1 de octubre de 2025. El inquilino es responsable de todos los servicios públicos, mantenimiento e impuestos sobre la propiedad (Arrendamiento Triple Neto). Se debe pagar un depósito de seguridad de $15,000 al momento de la firma. Existe una cláusula de aumento anual del alquiler del 3%. El local se utilizará únicamente para fines de oficina comercial. Se prohíbe el subarrendamiento sin el consentimiento previo por escrito del arrendador. El incumplimiento en el pago del alquiler por más de 30 días resultará en la terminación inmediata del contrato.`,
+                    college: `Este es un contrato de arrendamiento de 5 años para un espacio comercial, a partir del 1 de octubre de 2025. Tienes que pagar todos los costos del edificio como electricidad, reparaciones e impuestos. Esto se llama "Arrendamiento Triple Neto". Debes pagar un depósito de seguridad de $15,000 cuando firmes. Tu alquiler subirá un 3% cada año. Solo puedes usar el espacio como oficina. No puedes alquilárselo a otra persona (subarrendar) a menos que el propietario esté de acuerdo por escrito. Si te retrasas más de 30 días en el pago del alquiler, pueden desalojarte de inmediato.`,
+                    teen: `Estás alquilando un lugar para tu negocio por 5 years, a partir del 1 de octubre de 2025. Tienes que pagar por todo: las luces, cualquier arreglo e incluso los impuestos de la propiedad. ¡Es una gran responsabilidad! Necesitas darle al dueño $15,000 por adelantado como depósito de seguridad. Ojo: tu alquiler será un poco más caro (3% más) cada año. Solo puedes usar este lugar como oficina, no para otra cosa. Ni se te ocurra dejar que un amigo te lo alquile a menos que el dueño lo autorice por escrito. Súper importante: si te atrasas un mes con el alquiler, podrías perder el lugar de inmediato.`
+                }
+            };
+
+            let isExpanded = false;
+            let askPopup = null;
+
+            // --- Functions ---
+
+            function updateContent() {
+                const lang = languageSelect.value;
+                const level = complexitySelect.value;
+                const fullText = summaries[lang][level];
+                summaryContent.innerHTML = `<p>${isExpanded ? fullText : fullText.split('. ').slice(0, 2).join('. ') + '...'}</p>`;
+                showMoreBtn.textContent = isExpanded ? 'Show Less' : 'Show More';
+            }
+
+            function toggleSummaryExpansion() { isExpanded = !isExpanded; updateContent(); }
+
+            function simulateUpload() {
+                uploadSection.classList.add('opacity-0', 'scale-95');
+                setTimeout(() => {
+                    uploadSection.classList.add('hidden');
+                    analysisSection.classList.remove('hidden');
+                    analysisSection.classList.add('flex');
+                    historyToggleBtn.classList.remove('hidden');
+                    chatToggleBtn.classList.remove('hidden');
+                    mainQuestionBox.classList.remove('hidden');
+                    updateContent();
+                }, 500);
+            }
+
+            function simulateSpeak() {
+                speakIcon.classList.add('hidden'); speakingIcon.classList.remove('hidden');
+                speakButton.classList.remove('animate-pulse-speak'); speakButton.disabled = true;
+                setTimeout(() => {
+                    speakIcon.classList.remove('hidden'); speakingIcon.classList.add('hidden');
+                    speakButton.classList.add('animate-pulse-speak'); speakButton.disabled = false;
+                }, 4000);
+            }
+
+            function handleAskQuestion(fromInput) {
+                const questionText = fromInput.value.trim();
+                if (questionText === '') return;
+
+                if (chatOutputPanel.classList.contains('collapsed')) {
+                    toggleChatPanel(true);
+                }
+
+                if (!historyPanel.classList.contains('collapsed')) {
+                    historyPanel.classList.add('collapsed');
+                }
+
+                const userMessageHTML = `<div class="flex justify-end"><div class="bg-blue-500/30 max-w-xs p-3 rounded-xl text-white/90">${questionText}</div></div>`;
+                chatMessages.insertAdjacentHTML('beforeend', userMessageHTML);
+
+                const aiThinkingHTML = `<div id="ai-thinking" class="flex justify-start"><div class="bg-white/10 max-w-xs p-3 rounded-xl text-white/90 flex items-center gap-2"><span>AI is thinking</span><div class="w-1.5 h-1.5 bg-white/50 rounded-full animate-pulse" style="animation-delay: 0s;"></div><div class="w-1.5 h-1.5 bg-white/50 rounded-full animate-pulse" style="animation-delay: 0.2s;"></div><div class="w-1.5 h-1.5 bg-white/50 rounded-full animate-pulse" style="animation-delay: 0.4s;"></div></div></div>`;
+                chatMessages.insertAdjacentHTML('beforeend', aiThinkingHTML);
+
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                mainQuestionInput.value = '';
+                chatQuestionInput.value = '';
+
+                setTimeout(() => {
+                    const aiResponseText = `A "Triple Net Lease" is a lease agreement where the tenant is responsible for paying all of the operating expenses for the property. This includes property taxes, building insurance, and maintenance costs, in addition to the rent.`;
+                    const aiResponseHTML = `<div class="flex justify-start"><div class="bg-white/10 max-w-xs p-3 rounded-xl text-white/90">${aiResponseText}</div></div>`;
+                    document.getElementById('ai-thinking').remove();
+                    chatMessages.insertAdjacentHTML('beforeend', aiResponseHTML);
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }, 2500);
+            }
+
+            function hideAskPopup() { if (askPopup) { askPopup.remove(); askPopup = null; } }
+
+            function showAskPopup(selection, fromElement) {
+                hideAskPopup();
+                const range = selection.getRangeAt(0);
+                const rect = range.getBoundingClientRect();
+
+                askPopup = document.createElement('div');
+                askPopup.id = 'ask-popup';
+                askPopup.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-message-circle-question"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg><span>Ask about this</span>`;
+                document.body.appendChild(askPopup);
+
+                askPopup.style.left = `${rect.left + window.scrollX + rect.width / 2 - askPopup.offsetWidth / 2}px`;
+                askPopup.style.top = `${rect.top + window.scrollY - askPopup.offsetHeight - 8}px`;
+
+                const targetInput = fromElement && fromElement.id === 'chat-messages' ? chatQuestionInput : mainQuestionInput;
+
+                askPopup.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    if (targetInput) {
+                        targetInput.value = `What does "${selection.toString()}" mean?`;
+                        targetInput.focus();
+                    }
+                    hideAskPopup();
+                });
+            }
+
+            function toggleChatPanel(forceOpen = false) {
+                const isCollapsed = chatOutputPanel.classList.contains('collapsed');
+                if (forceOpen && !isCollapsed) return;
+                if (forceOpen || isCollapsed) { // Open it
+                    chatOutputPanel.classList.remove('collapsed');
+                    chatOutputPanel.style.width = '24rem';
+                    chatOutputPanel.style.padding = '0';
+                    mainQuestionBox.classList.add('hidden');
+                } else { // Close it
+                    chatOutputPanel.classList.add('collapsed');
+                    chatOutputPanel.style.width = '0';
+                    chatOutputPanel.style.padding = '0';
+                    mainQuestionBox.classList.remove('hidden');
+                }
+            }
+
+            function toggleHistoryPanel() {
+                const isHistoryCollapsed = historyPanel.classList.contains('collapsed');
+                const isChatOpen = !chatOutputPanel.classList.contains('collapsed');
+                const mainWidth = mainContent.offsetWidth;
+                const minMainWidth = 500;
+
+                if (isHistoryCollapsed && isChatOpen && mainWidth < minMainWidth) {
+                    toggleChatPanel(false);
+                }
+                historyPanel.classList.toggle('collapsed');
+            }
+
+            async function downloadPDF(elementId, fileName) {
+                const { jsPDF } = window.jspdf;
+                const contentToCapture = document.getElementById(elementId);
+
+                const canvas = await html2canvas(contentToCapture, {
+                    backgroundColor: '#0a0a0a',
+                    scale: 2,
+                    scrollY: -window.scrollY,
+                    height: contentToCapture.scrollHeight,
+                    windowHeight: contentToCapture.scrollHeight
+                });
+
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+                pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                pdf.save(fileName);
+            }
+
+            // --- Event Listeners ---
+            uploadButton.addEventListener('click', simulateUpload);
+            complexitySelect.addEventListener('change', updateContent);
+            languageSelect.addEventListener('change', updateContent);
+            speakButton.addEventListener('click', simulateSpeak);
+            showMoreBtn.addEventListener('click', toggleSummaryExpansion);
+            mainSendButton.addEventListener('click', () => handleAskQuestion(mainQuestionInput));
+            mainQuestionInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleAskQuestion(mainQuestionInput); });
+            chatSendButton.addEventListener('click', () => handleAskQuestion(chatQuestionInput));
+            chatQuestionInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleAskQuestion(chatQuestionInput); });
+
+            historyToggleBtn.addEventListener('click', toggleHistoryPanel);
+            chatToggleBtn.addEventListener('click', () => toggleChatPanel());
+            downloadChatBtn.addEventListener('click', () => downloadPDF('chat-messages', 'Astraea-AI-Chat.pdf'));
+            downloadSummaryBtn.addEventListener('click', () => downloadPDF('content-scroll-area', 'Astraea-Summary.pdf'));
+
+            const setupSelectionListener = (element) => {
+                element.addEventListener('mouseup', (e) => {
+                    const targetElement = e.currentTarget;
+                    setTimeout(() => {
+                        const selection = window.getSelection();
+                        if (selection && selection.toString().trim().length > 2) {
+                            showAskPopup(selection, targetElement);
+                        } else {
+                            hideAskPopup();
+                        }
+                    }, 10);
+                });
+            };
+            setupSelectionListener(contentScrollArea);
+            setupSelectionListener(chatMessages);
+
+            document.addEventListener('mousedown', (e) => { if (askPopup && !askPopup.contains(e.target)) hideAskPopup(); });
+
+            // Initialize Lucide Icons
+            lucide.createIcons();
+        });
+    </script>
+</body>
+
+</html>
